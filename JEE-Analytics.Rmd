@@ -2,7 +2,7 @@
 title: "Jee-Analytics"
 author: "Atreya"
 date: "28 February 2018"
-output: html_document
+output: rmarkdown::github_document
 ---
 
 ```{r setup, include=FALSE}
