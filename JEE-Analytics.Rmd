@@ -1,0 +1,138 @@
+---
+title: "Jee-Analytics"
+author: "Atreya"
+date: "28 February 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### **Exploration of JEE dataset**
+
+```{r message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+Check out the structure of the data
+```{r }
+df <- read.csv("data/jee2009.csv",stringsAsFactors=F)
+str(df)
+head(df)
+```
+
+Total of around 4 lakh people appeared for the exam. I'll give a rank to these people. For now I'll give the same rank for reptitions. Also, `GENDER`, `category` and `subcategory` need to be converted to factor types.
+```{r }
+df$jee_basic_rank <-df %>% 
+                    select(mark) %>%
+                    desc()%>%
+                    row_number()
+df$GENDER <- as.factor(df$GENDER)
+df$category <- as.factor(df$category)
+df$sub_category <- as.factor(df$sub_category)
+
+df %>%
+arrange(jee_basic_rank)%>%
+head(10)
+```
+
+Let's take a look at the extreme scores
+```{r }
+extremes_df <- df %>%
+               filter(math==max(math)) # maths champ
+extremes_df <- df %>%
+               filter(phys==max(phys))%>%
+               bind_rows(extremes_df) #physics champ
+extremes_df <- df %>%
+               filter(chem==max(chem))%>%
+               bind_rows(extremes_df) #chemistry champ
+extremes_df <- df %>%
+               filter(mark==max(mark))%>%
+               bind_rows(extremes_df) #overall champ
+extremes_df %>% arrange(desc(mark))
+```
+
+Lemme check my details and a few of my friends'
+```{r }
+df %>% filter(NAME=="ARAVIND B ATREYA")
+friends_df <- df %>%
+              filter(NAME=="V S R VIKRAM")
+friends_df <- df %>%
+              filter(row_number()==grep("*SANJAY DIXIT*",df$NAME,ignore.case=TRUE))%>%
+              bind_rows(friends_df)
+friends_df <- df %>%
+              filter(row_number()==grep("*RACHIT KOTHARI*",df$NAME,ignore.case=TRUE))%>%
+              bind_rows(friends_df)
+friends_df
+```
+
+### **Visualizations**
+
+Tidying up data for visualizations is essential as it is difficult to create visualizations with the data in its current format. It will be easier to plot if all the marks are in rows as opposed to columns.
+```{r}
+df_transform <-gather(df,subject,marks,math:mark)
+subject_names <- function(x){
+    if(x=="math"){
+        x<-"Mathematics"
+    } else if(x=="chem") {
+        x<-"Chemistry"
+    } else if(x=="phys") {
+        x<-"Physics"
+    } else {
+        x<-"Total"
+    }
+}
+df_transform$subject <- sapply(df_transform$subject,subject_names)
+df_transform$subject <- as.factor(df_transform$subject)#convert to factor
+df_transform <- df_transform %>%
+                filter(GENDER!="")#Remove a few entries wit no GENDER,very less
+head(df_transform)
+```
+
+#### **Frequency plot of marks**
+```{r}
+ggplot(data=df_transform,aes(x=marks,col=GENDER))+
+geom_freqpoly()+
+facet_grid(subject~.)+
+labs(x="Marks",y="Count")+
+theme_bw()
+```
+
+#### **Average marks** 
+```{r}
+#Compare boxplots Males vs Females
+df_average <- df_transform %>%
+              select(GENDER,subject,marks)%>%
+              group_by(GENDER,subject)%>%
+              summarize(Avg_marks=mean(marks))
+ggplot(df_average,aes(x=subject,y=Avg_marks,col=GENDER,group=GENDER))+
+geom_point()+
+geom_line()+
+labs(y="Average marks")+
+theme_bw()
+```
+
+#### **Rank vs Marks, only top 10000**
+```{r}
+ggplot(df_transform %>% filter(jee_basic_rank<10000),aes(x=jee_basic_rank,y=marks,col=subject))+
+geom_line()+
+facet_grid(subject~.)+
+labs(x="Rank",y="Marks",col="Subject")+
+theme_bw()
+```
+
+#### **Category-Gender wise appearance**
+```{r}
+ggplot(df_transform,aes(x=1,fill=GENDER))+
+geom_bar(position = "fill")+
+labs(y="Proportion")+
+theme_bw()
+
+ggplot(df_transform,aes(x=category,fill=GENDER))+
+geom_bar(position ="fill")+
+labs(x="Category",y="Proportion")+
+theme_bw()
+```
